@@ -1,56 +1,44 @@
 esphome:
-  name: smartdoorbell
-  platform: ESP8266
-  board: d1_mini
+  name: "esp32-smart-doorbell"
+  friendly_name: Smart Doorbell
+  min_version: 2026.04.0
+  name_add_mac_suffix: false
   project:
-    name: zuidwijk.doorbell
-    version: "2.0"
+    name: zuidwijk.esphome-doorbell
+    version: "3.0"
 
-dashboard_import:
-  package_import_url: github://zuidwijk/doorbell/smartdoorbell.yaml
-
-wifi:
-#  networks: []
-  
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
-  ap:
-    ssid: "smartdoorbell"
-#    ap_timeout: 15s
-
-captive_portal:
+esp32:
+  variant: esp32
+  framework:
+    type: esp-idf
 
 # Enable logging
 logger:
- 
-ota:
-
-improv_serial:
 
 # Enable Home Assistant API
 api:
-  services:
-    - service: dingdong
-      then:
-        - script.execute: dingdong_script
+  encryption: 
+    key: !secret api_doorbell
 
-script:
-  id: dingdong_script
-  then:
-    if:
-      condition:
-        - switch.is_on: chime_active
-      then:
-        - switch.turn_on: relay
-        - delay: 200ms
-        - switch.turn_off: relay
-        - delay: 600ms
-        - switch.turn_on: relay
-        - delay: 200ms
-        - switch.turn_off: relay
-        - delay: 600ms
-        - switch.turn_on: relay
-        - delay: 200ms
-        - switch.turn_off: relay    
+# Allow Over-The-Air updates
+ota:
+- platform: esphome
+  password: !secret ota_password_doorbell
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  min_auth_mode: WPA2
+
+# https://github.com/esphome/bluetooth-proxies/blob/main/esp32-generic/esp32-generic.yaml
+#esp32_ble_tracker:
+  #scan_parameters:
+    # We currently use the defaults to ensure Bluetooth
+    # can co-exist with WiFi In the future we may be able to
+    # enable the built-in coexistence logic in ESP-IDF
+    #active: true
+bluetooth_proxy:
+  active: true
 
 time:
   - platform: homeassistant
@@ -58,20 +46,20 @@ time:
  
 text_sensor:
   - platform: version
-    name: Doorbell ESPHome Version
+    name: "ESPHome Version"
   - platform: wifi_info
     ip_address:
-      name: Doorbell IP
+      name: "IP"
     ssid:
-      name: Doorbell SSID
+      name: "SSID"
     bssid:
-      name: Doorbell BSSID
+      name: "BSSID"
  
 sensor:
   - platform: uptime
-    name: Doorbell Uptime
+    name: "Uptime"
   - platform: wifi_signal
-    name: Doorbell WiFi Signal
+    name: "WiFi Signal"
     update_interval: 60s
  
 globals:
@@ -83,18 +71,18 @@ globals:
 switch:
   - platform: gpio
     pin:
-      number: D1
+      number: GPIO5
       inverted: false
-    name: "Doorbell Relay"
+    name: "Relay"
     id: relay
     internal: true
     icon: mdi:alarm-bell
   - platform: restart
-    name: "Doorbell Restart"
+    name: "Restart"
   - platform: template
-    name: Doorbell Chime Active
+    name: "Chime Active"
     id: chime_active
-    restore_state: false
+    restore_mode: disabled
     turn_on_action:
       - globals.set:
           id: chime
@@ -109,10 +97,10 @@ switch:
 binary_sensor:
   - platform: gpio
     pin:
-      number: D5
+      number: GPIO4
       mode: INPUT_PULLUP
       inverted: true
-    name: "Doorbell"
+    name: "Outside Switch"
     filters:
       # Small filter, to debounce the button press.
       - delayed_on: 25ms
@@ -130,4 +118,14 @@ binary_sensor:
       - switch.turn_off: relay        
  
   - platform: status
-    name: "Status Doorbell"
+    name: "Status"
+
+button:
+- platform: template
+  name: "Ring"
+  id: ring_button
+  icon: mdi:bell-ring
+  on_press:
+    - switch.turn_on: relay
+    - delay: 500ms
+    - switch.turn_off: relay
